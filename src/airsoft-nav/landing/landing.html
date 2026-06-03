@@ -1,0 +1,436 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AirsoftNavTeam — Навигация для страйкбольных команд</title>
+  <meta name="description" content="Приложение для навигации и координации страйкбольных команд. Работа без интернета, локальное хранение данных, тестирование без DMR-оборудования."/>
+  <style>
+    :root {
+      --primary: #2c5f2d;
+      --primary-dark: #1e4520;
+      --accent: #ffc107;
+      --dark: #1a1a1a;
+      --light: #f8f9fa;
+      --gray: #6c757d;
+      --shadow: 0 4px 12px rgba(0,0,0,0.15);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: var(--light);
+    }
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: var(--shadow);
+    }
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: bold;
+      color: var(--dark);
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin-left: 1.5rem;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+    nav a:hover { opacity: 0.85; }
+    .hero {
+      background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect fill="%232c5f2d" width="400" height="300"/><circle fill="%231e4520" cx="100" cy="100" r="60"/><circle fill="%231e4520" cx="300" cy="200" r="80"/><rect fill="%233a7a3b" x="50" y="220" width="300" height="40" rx="5"/></svg>');
+      background-size: cover;
+      background-position: center;
+      color: white;
+      text-align: center;
+      padding: 4rem 2rem;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .hero p {
+      font-size: 1.25rem;
+      max-width: 700px;
+      margin: 0 auto 2rem;
+      opacity: 0.95;
+    }
+    .btn {
+      display: inline-block;
+      background: var(--accent);
+      color: var(--dark);
+      padding: 0.9rem 2rem;
+      border-radius: 50px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid white;
+      color: white;
+      margin-left: 1rem;
+    }
+    .btn-outline:hover {
+      background: white;
+      color: var(--primary);
+    }
+    section {
+      padding: 4rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-title {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 3rem;
+      color: var(--primary-dark);
+      position: relative;
+    }
+    .section-title::after {
+      content: '';
+      display: block;
+      width: 60px;
+      height: 4px;
+      background: var(--accent);
+      margin: 0.75rem auto 0;
+      border-radius: 2px;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+    }
+    .feature-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s;
+    }
+    .feature-card:hover {
+      transform: translateY(-5px);
+    }
+    .feature-icon {
+      width: 56px;
+      height: 56px;
+      background: rgba(44, 95, 45, 0.1);
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 1.25rem;
+      font-size: 1.5rem;
+      color: var(--primary);
+      font-weight: bold;
+    }
+    .feature-card h3 {
+      margin-bottom: 0.75rem;
+      color: var(--primary-dark);
+    }
+    .demo-section {
+      background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      text-align: center;
+      margin: 2rem 0;
+    }
+    .demo-badge {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 0.35rem 1rem;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .privacy-section {
+      background: white;
+      border-radius: var(--radius);
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      margin-top: 2rem;
+    }
+    .privacy-content {
+      max-height: 400px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+      font-size: 0.95rem;
+      color: #444;
+      line-height: 1.7;
+    }
+    .privacy-content h4 {
+      margin: 1.25rem 0 0.5rem;
+      color: var(--primary-dark);
+    }
+    .owner-info {
+      text-align: center;
+      padding: 1.5rem;
+      background: #f1f8e9;
+      border-radius: var(--radius);
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .badge-no-server {
+      display: inline-block;
+      background: #dc3545;
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+    footer {
+      background: var(--dark);
+      color: #ccc;
+      text-align: center;
+      padding: 2rem;
+      margin-top: 3rem;
+    }
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 768px) {
+      .header-content { flex-direction: column; gap: 1rem; }
+      nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
+      nav a { margin: 0; }
+      .hero h1 { font-size: 2rem; }
+      .hero p { font-size: 1.1rem; }
+      .btn { width: 100%; margin: 0.5rem 0 !important; }
+      .btn-outline { margin-left: 0 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Шапка -->
+  <header>
+    <div class="header-content">
+      <div class="logo">
+        <div class="logo-icon">A</div>
+        AirsoftNavTeam
+      </div>
+      <nav>
+        <a href="#features">Возможности</a>
+        <a href="#demo">Тестирование</a>
+        <a href="#privacy">Конфиденциальность</a>
+        <a href="#contact">Контакты</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Герой -->
+  <section class="hero">
+    <h1>Навигация для страйкбольных команд</h1>
+    <p>Создавайте команды, отслеживайте игроков на карте, подключайтесь к DMR-хотспотам и координируйте действия в реальном времени. <strong>Без серверов — все данные только на вашем устройстве.</strong></p>
+    <div>
+      <a href="#features" class="btn">Узнать больше</a>
+    </div>
+  </section>
+
+  <!-- Возможности -->
+  <section id="features">
+    <h2 class="section-title">Возможности приложения</h2>
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">👥</div>
+        <h3>Создание команд</h3>
+        <p>Быстро формируйте отряды, назначайте роли и приглашайте участников по ссылке или QR-коду.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📍</div>
+        <h3>Отслеживание на карте</h3>
+        <p>В реальном времени видите положение всех игроков вашей команды на интерактивной карте с офлайн-поддержкой.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3>Ваше местоположение</h3>
+        <p>Точное определение вашей позиции через GPS/ГЛОНАСС с возможностью ручной коррекции.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📡</div>
+        <h3>DMR-хотспоты</h3>
+        <p>Подключайтесь к цифровым радиомостам для передачи координат без интернета. Работает в лесу и на пересечённой местности.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Приватность по умолчанию <span class="badge-no-server">НЕТ СЕРВЕРОВ</span></h3>
+        <p>Все данные хранятся только на вашем устройстве. ID радиостанции и позывной — ничего лишнего. Геоданные не сохраняются после сессии.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌲</div>
+        <h3>Работа офлайн</h3>
+        <p>Не требуется интернет. Обмен координатами происходит напрямую между устройствами через DMR или Bluetooth.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Тестирование / Демо (Информационный) -->
+  <section id="demo">
+    <h2 class="section-title">Тестирование функционала</h2>
+    <div class="demo-section">
+      <span class="demo-badge">📱 Только в приложении</span>
+      <h3>Деморежим и работа без DMR</h3>
+      <p style="margin: 1rem 0 1.5rem;">
+        На данном сайте доступна только ознакомительная информация. 
+        <strong>Деморежим встроен непосредственно в мобильное приложение.</strong>
+      </p>
+      <p style="font-size: 0.95rem; opacity: 0.9; max-width: 700px; margin: 0 auto; line-height: 1.8;">
+        ✅ <strong>Без оборудования:</strong> В приложении можно протестировать навигацию и отслеживание игроков без подключения к физическому DMR хотспоту.<br>
+        ✅ <strong>Без интернета:</strong> Проверьте работу карты и GPS в полевых условиях.<br>
+        ✅ <strong>Без регистрации:</strong> Все данные локальны, серверная часть отсутствует.
+      </p>
+    </div>
+  </section>
+
+  <!-- Политика конфиденциальности -->
+  <section id="privacy">
+    <h2 class="section-title">Политика конфиденциальности</h2>
+    <div class="privacy-section">
+      <div class="privacy-content">
+        <h4>1. Общие положения</h4>
+        <p>Настоящая Политика конфиденциальности описывает, как владелец приложения «AirSoft Nav» (Елфимова Надежда Анатольевна) обрабатывает данные пользователей. <strong>Приложение не использует серверы для хранения или передачи персональных данных.</strong></p>
+        
+        <h4>2. Какие данные хранятся в приложении</h4>
+        <p><strong>Только локально на вашем устройстве сохраняются:</strong><br>
+        • ID радиостанции (уникальный идентификатор DMR-устройства);<br>
+        • Позывной (никнейм, введённый пользователем).<br><br>
+        <strong>Мы НЕ собираем, НЕ передаём и НЕ храним:</strong><br>
+        • Геолокационные данные после завершения сессии;<br>
+        • Контакты, фото, аудио, историю перемещений;<br>
+        • Данные аккаунтов, email, телефон;<br>
+        • Любую информацию на внешних серверах.</p>
+        
+        <h4>3. Как используются данные</h4>
+        <p>• ID радиостанции и позывной используются исключительно для:<br>
+        &nbsp;&nbsp;– идентификации вас внутри команды на карте;<br>
+        &nbsp;&nbsp;– корректной работы обмена координатами через DMR-хотспоты;<br>
+        &nbsp;&nbsp;– работы деморежима внутри приложения.<br>
+        • Все данные остаются в памяти вашего устройства и удаляются при удалении приложения.</p>
+        
+        <h4>4. Хранение и защита</h4>
+        <p><strong>Архитектура без сервера:</strong><br>
+        • Нет облачного хранения, нет баз данных, нет аналитики;<br>
+        • Геопозиция передаётся только в реальном времени между устройствами команды через зашифрованный DMR-канал или Bluetooth;<br>
+        • После выхода из приложения или завершения сессии координаты удаляются из оперативной памяти;<br>
+        • ID радиостанции и позывной хранятся в защищённом хранилище устройства (SharedPreferences / Keychain).</p>
+        
+        <h4>5. Права пользователя</h4>
+        <p>Вы можете в любой момент:<br>
+        • Изменить или удалить свой позывной в настройках приложения;<br>
+        • Очистить все локальные данные через «Настройки → Сброс»;<br>
+        • Полностью удалить приложение — все данные будут безвозвратно удалены;<br>
+        • Написать на airsoft@mailcase.net для консультации по обработке данных.</p>
+        
+        <h4>6. Контактная информация</h4>
+        <p>По вопросам обработки данных обращайтесь:<br>
+        <strong>Владелец:</strong> Елфимова Надежда Анатольевна<br>
+        <strong>Email:</strong> <a href="mailto:airsoft@mailcase.net">airsoft@mailcase.net</a></p>
+        
+        <p style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--gray);">
+          Последнее обновление: 18 февраля 2026 г.<br>
+          Применяется к версиям приложения 1.0 и выше.<br>
+          <strong>Серверная часть отсутствует. Все данные — только на вашем устройстве.</strong>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Контакты -->
+  <section id="contact">
+    <h2 class="section-title">Связаться с разработчиком</h2>
+    <div class="owner-info">
+      <p><strong>Владелец и разработчик:</strong><br>Елфимова Надежда Анатольевна<br></p>
+      <p style="margin: 1rem 0;"><strong>Email для связи:</strong><br><a href="mailto:airsoft@mailcase.net" style="color: var(--primary); font-weight: 500;">airsoft@mailcase.net</a></p>
+      <p style="font-size: 0.95rem; color: var(--gray);">
+        Приложение находится в стадии активной разработки.<br>
+        Предложения и отчёты об ошибках приветствуются.
+      </p>
+    </div>
+  </section>
+
+  <!-- Футер -->
+  <footer>
+    <p>© 2026 AirsoftNavTeam. Все права защищены.</p>
+    <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+      Владелец: Елфимова Н.А. | 
+      <a href="mailto:airsoft@mailcase.net">airsoft@mailcase.net</a>
+    </p>
+    <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #888;">
+      🔒 Локальное хранение • Нет серверов • No cloud • GDPR/152-ФЗ compatible
+    </p>
+  </footer>
+
+  <script>
+    // Плавная прокрутка
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // Анимация появления карточек при прокрутке
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = 1;
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.feature-card').forEach(card => {
+      card.style.opacity = 0;
+      card.style.transform = 'translateY(20px)';
+      card.style.transition = 'opacity 0.4s, transform 0.4s';
+      observer.observe(card);
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+export const PERCENT_COEFFICIENT = 100;
+
+export const alphaValues = {
+    ten: 0.1,
+    twelve: 0.12,
+    fifteen: 0.15,
+    twenty: 0.2,
+    twentyFour: 0.24,
+    twentyFive: 0.25,
+    thirty: 0.3,
+    thirtyFive: 0.35,
+    thirtySix: 0.36,
+    fourty: 0.4,
+    fourtyFive: 0.45,
+    fifty: 0.5,
+    fiftyFive: 0.55,
+    sixty: 0.6,
+    sixtyFive: 0.65,
+    seventy: 0.7,
+    seventyFive: 0.75,
+    eighty: 0.8,
+    eightyFive: 0.85,
+    ninety: 0.9,
+    ninetyFive: 0.95,
+    hundred: 1,
+};
