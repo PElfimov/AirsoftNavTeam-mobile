@@ -15,8 +15,8 @@ export type ServerSettings = {
 
 const DEFAULT_SETTINGS: ServerSettings = {
     enabled: false,
-    host: '192.168.4.1',
-    port: 8080,
+    host: '192.168.10.1',
+    port: 8000,
     interval: 5000,
     demoMode: false,
 };

@@ -1,17 +1,27 @@
 // src/airsoft-nav/app/hooks/useServerPlayers.ts
 import {useQuery, useQueryClient} from '@tanstack/react-query';
-import {useEffect, useRef} from 'react';
+import {useEffect, useMemo, useRef} from 'react';
 
 import {ServerPlayer} from '@src/airsoft-nav/types/server';
 import {useServerSettings} from './useServerSettings';
+import {useHotspotConnection, ConnectionStatus} from './useHotspotConnection';
 import {generateDemoPlayers, startDemoAnimation} from '../data/demoData';
+
+const REST_FALLBACK_INTERVAL_MS = 30_000;
 
 export const useServerPlayers = () => {
     const {data: settings} = useServerSettings();
     const queryClient = useQueryClient();
     const animationRef = useRef<() => void>(() => {});
 
-    // Останавливаем анимацию при размонтировании
+    const demoMode = !!settings?.demoMode;
+    const realEnabled = !demoMode && !!settings?.enabled && !!settings?.host;
+
+    const queryKey = useMemo(
+        () => ['serverPlayers', demoMode, settings?.host, settings?.port] as const,
+        [demoMode, settings?.host, settings?.port],
+    );
+
     useEffect(() => {
         return () => {
             if (animationRef.current) {
@@ -21,34 +31,30 @@ export const useServerPlayers = () => {
     }, []);
 
     const query = useQuery<ServerPlayer[]>({
-        queryKey: ['serverPlayers', settings?.demoMode, settings?.enabled],
+        queryKey,
         queryFn: async (): Promise<ServerPlayer[]> => {
-            // ДЕМО-РЕЖИМ: возвращаем мок-данные
-            if (settings?.demoMode) {
+            if (demoMode) {
                 const demoPlayers = generateDemoPlayers();
-
-                // Запускаем анимацию движения
                 if (animationRef.current) {
                     animationRef.current();
                 }
                 animationRef.current = startDemoAnimation((updatedPlayers) => {
-                    queryClient.setQueryData(['serverPlayers', true, true], updatedPlayers);
+                    queryClient.setQueryData(queryKey, updatedPlayers);
                 });
-
                 return demoPlayers;
             }
 
-            // РЕАЛЬНЫЙ РЕЖИМ: запрос к хотспоту
-            if (!settings?.enabled || !settings.host) {
+            if (!realEnabled || !settings) {
                 return [];
             }
 
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
-                const response = await fetch(`http://${settings.host}:${settings.port}/api/players`, {
-                    signal: controller.signal,
-                });
+                const response = await fetch(
+                    `http://${settings.host}:${settings.port}/api/players`,
+                    {signal: controller.signal},
+                );
                 clearTimeout(timeoutId);
 
                 if (!response.ok) {
@@ -59,13 +65,23 @@ export const useServerPlayers = () => {
                 return data.players || [];
             } catch (error) {
                 console.warn('Ошибка получения данных с сервера:', error);
-                return [];
+                // Не затираем уже имеющийся кэш (например, от WS) — возвращаем то, что есть
+                return queryClient.getQueryData<ServerPlayer[]>(queryKey) || [];
             }
         },
-        enabled: !!settings?.enabled || !!settings?.demoMode,
-        refetchInterval: settings?.demoMode ? 2000 : settings?.interval || 5000, // Чаще для демо
+        enabled: realEnabled || demoMode,
+        // В real-режиме данные идут по WS, REST — лишь редкий fallback (восстановление после долгого офлайна).
+        // В демо — refetch не нужен, анимация сама обновляет кэш.
+        refetchInterval: realEnabled ? REST_FALLBACK_INTERVAL_MS : false,
         refetchOnWindowFocus: false,
-        retry: settings?.demoMode ? false : 2,
+        retry: demoMode ? false : 2,
+    });
+
+    const connectionStatus: ConnectionStatus = useHotspotConnection({
+        host: settings?.host || '',
+        port: settings?.port || 0,
+        enabled: realEnabled,
+        queryKey,
     });
 
     return {
@@ -73,7 +89,8 @@ export const useServerPlayers = () => {
         isLoading: query.isLoading,
         error: query.error,
         enabled: settings?.enabled || false,
-        demoMode: settings?.demoMode || false,
+        demoMode,
+        connectionStatus,
         refetch: query.refetch,
     };
 };

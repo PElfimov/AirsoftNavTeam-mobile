@@ -4,6 +4,7 @@ import {View, Text, Switch, Alert, Linking, ScrollView} from 'react-native';
 import styled from 'styled-components/native';
 
 import {useServerSettings, useServerSettingsMutations} from '@src/airsoft-nav/app/hooks/useServerSettings';
+import {useServerPlayers} from '@src/airsoft-nav/app/hooks/useServerPlayers';
 
 const Container = styled.View`
     flex: 1;
@@ -144,17 +145,25 @@ const TouchableOpacity = styled.TouchableOpacity``;
 export const ServerSettingsScreen = () => {
     const {data: settings, isLoading} = useServerSettings(); // ← Используем `data` из useQuery
     const {updateSettings, toggleDemoMode, resetToDefaults} = useServerSettingsMutations();
+    const {connectionStatus, serverPlayers} = useServerPlayers();
+
+    const statusLabel: Record<typeof connectionStatus, {text: string; color: string}> = {
+        idle: {text: 'Не активно', color: '#7f8c8d'},
+        connecting: {text: 'Подключение…', color: '#f39c12'},
+        online: {text: `Онлайн · ${serverPlayers.length} игроков`, color: '#27ae60'},
+        offline: {text: 'Нет связи', color: '#e74c3c'},
+    };
 
     // Безопасная инициализация состояния
-    const [host, setHost] = useState('192.168.4.1');
-    const [port, setPort] = useState('8080');
+    const [host, setHost] = useState('192.168.10.1');
+    const [port, setPort] = useState('8000');
     const [interval, setInterval] = useState('5000');
 
     // Обновляем состояние при получении настроек
     useEffect(() => {
         if (settings) {
-            setHost(settings.host || '192.168.4.1');
-            setPort(settings.port?.toString() || '8080'); // ← Безопасный вызов
+            setHost(settings.host || '192.168.10.1');
+            setPort(settings.port?.toString() || '8000');
             setInterval(settings.interval?.toString() || '5000');
         }
     }, [settings]);
@@ -169,7 +178,7 @@ export const ServerSettingsScreen = () => {
     }
 
     const handleSave = () => {
-        const portNum = parseInt(port) || 8080;
+        const portNum = parseInt(port) || 8000;
         const intervalNum = parseInt(interval) || 5000;
 
         if (portNum < 1 || portNum > 65535) {
@@ -326,7 +335,7 @@ export const ServerSettingsScreen = () => {
                         <FormInput
                             selectTextOnFocus
                             editable={!settings.demoMode}
-                            placeholder='192.168.4.1'
+                            placeholder='192.168.10.1'
                             value={host}
                             onChangeText={setHost}
                         />
@@ -338,7 +347,7 @@ export const ServerSettingsScreen = () => {
                             selectTextOnFocus
                             editable={!settings.demoMode}
                             keyboardType='numeric'
-                            placeholder='8080'
+                            placeholder='8000'
                             value={port}
                             onChangeText={(text) => {
                                 // Разрешаем только цифры
@@ -373,6 +382,29 @@ export const ServerSettingsScreen = () => {
                             onValueChange={(value) => updateSettings.mutate({enabled: value})}
                         />
                     </SwitchRow>
+
+                    {!settings.demoMode && (
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingVertical: 12,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 5,
+                                    backgroundColor: statusLabel[connectionStatus].color,
+                                    marginRight: 10,
+                                }}
+                            />
+                            <Text style={{color: statusLabel[connectionStatus].color, fontSize: 14}}>
+                                {statusLabel[connectionStatus].text}
+                            </Text>
+                        </View>
+                    )}
 
                     {settings.demoMode && (
                         <Text style={{color: '#3498db', fontSize: 13, marginTop: 10, fontStyle: 'italic'}}>
