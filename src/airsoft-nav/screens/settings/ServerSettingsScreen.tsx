@@ -177,7 +177,7 @@ export const ServerSettingsScreen = () => {
         );
     }
 
-    const handleSave = () => {
+    const persistConnection = (override: Partial<{enabled: boolean}> = {}) => {
         const portNum = parseInt(port) || 8000;
         const intervalNum = parseInt(interval) || 5000;
 
@@ -194,8 +194,8 @@ export const ServerSettingsScreen = () => {
             host,
             port: portNum,
             interval: intervalNum,
+            ...override,
         });
-        Alert.alert('Успех', 'Настройки сохранены');
     };
 
     const handleToggleDemo = (enabled: boolean) => {
@@ -338,6 +338,7 @@ export const ServerSettingsScreen = () => {
                             placeholder='192.168.10.1'
                             value={host}
                             onChangeText={setHost}
+                            onBlur={() => persistConnection()}
                         />
                     </FormRow>
 
@@ -350,10 +351,10 @@ export const ServerSettingsScreen = () => {
                             placeholder='8000'
                             value={port}
                             onChangeText={(text) => {
-                                // Разрешаем только цифры
                                 const cleaned = text.replace(/[^0-9]/g, '');
                                 setPort(cleaned);
                             }}
+                            onBlur={() => persistConnection()}
                         />
                     </FormRow>
 
@@ -369,6 +370,7 @@ export const ServerSettingsScreen = () => {
                                 const cleaned = text.replace(/[^0-9]/g, '');
                                 setInterval(cleaned);
                             }}
+                            onBlur={() => persistConnection()}
                         />
                     </FormRow>
 
@@ -379,7 +381,7 @@ export const ServerSettingsScreen = () => {
                             thumbColor={settings.enabled || settings.demoMode ? '#fff' : '#f4f3f4'}
                             trackColor={{false: '#767577', true: '#27ae60'}}
                             value={settings.enabled || false}
-                            onValueChange={(value) => updateSettings.mutate({enabled: value})}
+                            onValueChange={(value) => persistConnection({enabled: value})}
                         />
                     </SwitchRow>
 
