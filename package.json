@@ -11,6 +11,7 @@
     "pods": "cd ios && bundle exec pod install && cd .."
   },
   "dependencies": {
+    "@maplibre/maplibre-react-native": "10.4.2",
     "@react-native-async-storage/async-storage": "1.18.1",
     "@react-native-community/geolocation": "3.4.0",
     "@react-native-picker/picker": "1.14.0",
@@ -25,7 +26,6 @@
     "react-native": "0.79.6",
     "react-native-biometrics": "3.0.1",
     "react-native-gesture-handler": "2.28.0",
-    "react-native-maps": "1.26.0",
     "react-native-reanimated": "3.19.1",
     "react-native-safe-area-context": "5.6.1",
     "react-native-screens": "4.11.1",

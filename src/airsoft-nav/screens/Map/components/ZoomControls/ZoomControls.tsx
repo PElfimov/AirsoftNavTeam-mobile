@@ -1,12 +1,15 @@
+import React from 'react';
 import styled from 'styled-components/native';
 import {TouchableOpacity, View} from 'react-native';
-import MapView, {Region} from 'react-native-maps';
+import type {CameraRef} from '@maplibre/maplibre-react-native';
 
 import {MinusIcon} from '@src/airsoft-nav/ui/icons/MinusIcon';
 import {PlusIcon} from '@src/airsoft-nav/ui/icons/PlusIcon';
 import {COLORS} from '@src/airsoft-nav/ui/constants/colors';
 
-const ZOOM_FACTOR = 2; // Коэффициент масштабирования
+const ZOOM_STEP = 1;
+const MIN_ZOOM = 2;
+const MAX_ZOOM = 18;
 
 const Controls = styled(View)`
     align-items: center;
@@ -24,31 +27,26 @@ const Button = styled(TouchableOpacity)`
 `;
 
 interface Props {
-    mapRef: React.RefObject<MapView>;
-    region: Region;
-    setRegion: (region: Region) => void;
+    cameraRef: React.RefObject<CameraRef | null>;
+    zoom: number;
+    setZoom: (zoom: number) => void;
 }
-export const ZoomControls: React.FC<Props> = ({mapRef, region, setRegion}) => {
+
+const clamp = (value: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+
+export const ZoomControls: React.FC<Props> = ({cameraRef, zoom, setZoom}) => {
     const handleZoomIn = () => {
-        const newRegion = {
-            ...region,
-            latitudeDelta: region.latitudeDelta / ZOOM_FACTOR,
-            longitudeDelta: region.longitudeDelta / ZOOM_FACTOR,
-        };
-        setRegion(newRegion);
-        mapRef.current?.animateToRegion(newRegion, 300);
+        const next = clamp(zoom + ZOOM_STEP);
+        setZoom(next);
+        cameraRef.current?.zoomTo(next, 300);
     };
 
-    // Уменьшение масштаба (отдаление)
     const handleZoomOut = () => {
-        const newRegion = {
-            ...region,
-            latitudeDelta: region.latitudeDelta * ZOOM_FACTOR,
-            longitudeDelta: region.longitudeDelta * ZOOM_FACTOR,
-        };
-        setRegion(newRegion);
-        mapRef.current?.animateToRegion(newRegion, 300);
+        const next = clamp(zoom - ZOOM_STEP);
+        setZoom(next);
+        cameraRef.current?.zoomTo(next, 300);
     };
+
     return (
         <Controls>
             <Button onPress={handleZoomIn}>

@@ -1,6 +1,5 @@
-// src/airsoft-nav/app/screens/map/UnauthenticatedMapScreen.tsx
 import React, {useRef, useState} from 'react';
-import MapView, {Marker, Region} from 'react-native-maps';
+import {Camera, MapView, MarkerView, type CameraRef} from '@maplibre/maplibre-react-native';
 import styled from 'styled-components/native';
 import {SafeAreaView, StatusBar, Animated} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
@@ -9,8 +8,12 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {UserMarker} from '../../ui/icons/UserMarker';
 import {ZoomControls} from './components/ZoomControls/ZoomControls';
 import {LocateButton} from './components/LocateButton';
+import {getMapStyleJSON} from './mapStyles';
 import {Button} from '@src/airsoft-nav/ui/controls/Button';
 import {COLORS} from '@src/airsoft-nav/ui/constants/colors';
+
+const DEFAULT_CENTER: [number, number] = [37.6173, 55.7558];
+const DEFAULT_ZOOM = 11;
 
 const Container = styled.View`
     align-items: center;
@@ -45,16 +48,6 @@ const InfoText = styled.Text`
     text-align: center;
 `;
 
-const FeaturesList = styled.View`
-    margin-top: 10px;
-`;
-
-const FeatureItem = styled.Text`
-    color: ${COLORS.contrast};
-    font-size: 14px;
-    margin-bottom: 5px;
-`;
-
 const ButtonContainer = styled.View`
     position: absolute;
     bottom: 50px;
@@ -74,18 +67,9 @@ const BottomControlsContainer = styled.View<{topInset: number}>`
 export const UnauthenticatedMapScreen = () => {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
-    const mapRef = useRef<MapView>(null);
-    const [userLocation, setUserLocation] = useState<Region | null>(null);
-    const [region, setRegion] = useState<Region>({
-        latitude: 55.7558,
-        longitude: 37.6173,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-    });
-
-    const handleRegionChange = (newRegion: Region) => {
-        setRegion(newRegion);
-    };
+    const cameraRef = useRef<CameraRef | null>(null);
+    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+    const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
 
     const handleLoginPress = () => {
         // @ts-ignore
@@ -97,25 +81,22 @@ export const UnauthenticatedMapScreen = () => {
             <StatusBar barStyle='dark-content' />
             <Container>
                 <MapView
-                    initialRegion={region}
-                    mapType='standard'
-                    ref={mapRef}
-                    showsMyLocationButton={false}
-                    showsUserLocation={false}
                     style={{flex: 1, width: '100%'}}
-                    onRegionChangeComplete={handleRegionChange}
+                    mapStyle={getMapStyleJSON('standard')}
+                    attributionEnabled={true}
+                    logoEnabled={false}
                 >
+                    <Camera
+                        ref={cameraRef}
+                        defaultSettings={{
+                            centerCoordinate: DEFAULT_CENTER,
+                            zoomLevel: DEFAULT_ZOOM,
+                        }}
+                    />
                     {userLocation && (
-                        <Marker
-                            anchor={{x: 0.5, y: 0.5}}
-                            coordinate={{
-                                latitude: userLocation.latitude,
-                                longitude: userLocation.longitude,
-                            }}
-                            tracksViewChanges={false}
-                        >
+                        <MarkerView coordinate={userLocation} anchor={{x: 0.5, y: 0.5}}>
                             <UserMarker size={40} />
-                        </Marker>
+                        </MarkerView>
                     )}
                 </MapView>
             </Container>
@@ -130,8 +111,8 @@ export const UnauthenticatedMapScreen = () => {
                 <Button text='Войти' onPress={handleLoginPress} />
             </ButtonContainer>
             <BottomControlsContainer topInset={insets.top}>
-                <ZoomControls mapRef={mapRef} region={region} setRegion={setRegion} />
-                <LocateButton mapRef={mapRef} setRegion={setRegion} setUserLocation={setUserLocation} />
+                <ZoomControls cameraRef={cameraRef} zoom={zoom} setZoom={setZoom} />
+                <LocateButton cameraRef={cameraRef} setUserLocation={setUserLocation} setZoom={setZoom} />
             </BottomControlsContainer>
         </SafeAreaView>
     );

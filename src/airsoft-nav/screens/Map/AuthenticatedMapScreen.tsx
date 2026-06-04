@@ -1,8 +1,7 @@
 /* eslint-disable no-nested-ternary */
-// src/airsoft-nav/app/screens/map/AuthenticatedMapScreen.tsx
 import React, {FC, useRef, useState} from 'react';
 import {SafeAreaView, StatusBar, TouchableOpacity, Text, FlatList, View, Alert, ScrollView} from 'react-native';
-import MapView, {Region, Marker} from 'react-native-maps';
+import {Camera, MapView, MarkerView, type CameraRef} from '@maplibre/maplibre-react-native';
 import styled from 'styled-components/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
@@ -10,6 +9,7 @@ import {Picker} from '@react-native-picker/picker';
 import {UserMarker} from '../../ui/icons/UserMarker';
 import {ZoomControls} from './components/ZoomControls/ZoomControls';
 import {LocateButton} from './components/LocateButton';
+import {getMapStyleJSON, type MapStyleId} from './mapStyles';
 import {useActiveTeams, useTeamMutations, useTeams} from '@src/airsoft-nav/app/hooks/useTeams';
 import {useMapSettings, useMapSettingsMutations} from '@src/airsoft-nav/app/hooks/useMapSettings';
 import {useServerSettings} from '@src/airsoft-nav/app/hooks/useServerSettings';
@@ -18,6 +18,10 @@ import {Modal} from '@src/airsoft-nav/ui/Modal/Modal';
 import {IconButton} from '@src/airsoft-nav/ui/controls/IconButton';
 import {ColorInput} from '@src/airsoft-nav/ui/controls/ColorInput/ColorInput';
 import {COLORS} from '@src/airsoft-nav/ui/constants/colors';
+
+const DEFAULT_CENTER: [number, number] = [37.6173, 55.7558];
+const DEFAULT_ZOOM = 11;
+const PLAYER_FOCUS_ZOOM = 15;
 
 const Container = styled.View`
     align-items: center;
@@ -132,20 +136,14 @@ export const AuthenticatedMapScreen: FC = () => {
     const {data: serverSettings} = useServerSettings();
     const demoMode = serverSettings?.demoMode || false;
 
-    const mapRef = useRef<MapView>(null);
-    const [userLocation, setUserLocation] = useState<Region | null>(null);
-    const [region, setRegion] = useState<Region>({
-        latitude: 55.7558,
-        longitude: 37.6173,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-    });
+    const cameraRef = useRef<CameraRef | null>(null);
+    const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+    const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
+    const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
     const [showSettings, setShowSettings] = useState<boolean>(false);
     const [showColorPicker, setShowColorPicker] = useState<boolean>(false);
 
-    const handleRegionChange = (newRegion: Region) => {
-        setRegion(newRegion);
-    };
+    const mapType: MapStyleId = (mapSettings?.mapType as MapStyleId) || 'hybrid';
 
     const getTeamColor = (teamId: string): string => {
         const team = teams.find((t) => t.id === teamId);
@@ -155,18 +153,17 @@ export const AuthenticatedMapScreen: FC = () => {
     const renderPlayerMarker = (player: any) => {
         const teamColor = getTeamColor(player.teamId);
         const opacity = player.status === 'eliminated' ? 0.5 : 1;
+        if (!player.coordinates) {
+            return null;
+        }
+        const coordinate: [number, number] = [player.coordinates.longitude, player.coordinates.latitude];
 
         return (
-            <Marker
-                key={player.id}
-                coordinate={player.coordinates || {latitude: 0, longitude: 0}}
-                title={player.callsign}
-                tracksViewChanges={false}
-            >
+            <MarkerView key={player.id} coordinate={coordinate} anchor={{x: 0.5, y: 0.5}}>
                 <PlayerMarkerContainer color={teamColor} opacity={opacity}>
                     <PlayerMarkerText>{player.callsign.charAt(0)}</PlayerMarkerText>
                 </PlayerMarkerContainer>
-            </Marker>
+            </MarkerView>
         );
     };
 
@@ -174,32 +171,23 @@ export const AuthenticatedMapScreen: FC = () => {
         .filter((team) => activeTeamIds.includes(team.id))
         .reduce((sum, team) => sum + team.players.length, 0);
 
-    // Функция центрирования на игроке
     const focusOnPlayer = (player: any) => {
         if (!player?.coordinates) {
             Alert.alert('Ошибка', `У игрока ${player.callsign} нет координат`);
             return;
         }
 
-        const newRegion: Region = {
-            latitude: player.coordinates.latitude,
-            longitude: player.coordinates.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-        };
+        const coordinate: [number, number] = [player.coordinates.longitude, player.coordinates.latitude];
+        setCenter(coordinate);
+        setZoom(PLAYER_FOCUS_ZOOM);
+        cameraRef.current?.setCamera({
+            centerCoordinate: coordinate,
+            zoomLevel: PLAYER_FOCUS_ZOOM,
+            animationMode: 'flyTo',
+            animationDuration: 1000,
+        });
 
-        setRegion(newRegion);
-        mapRef.current?.animateToRegion(newRegion, 1000);
-
-        // Показать уведомление
-        Alert.alert('Найден игрок', `${player.callsign} (${player.role || 'игрок'})`, [
-            {
-                text: 'OK',
-                onPress: () => {
-                    // Дополнительные действия при необходимости
-                },
-            },
-        ]);
+        Alert.alert('Найден игрок', `${player.callsign} (${player.role || 'игрок'})`);
     };
 
     return (
@@ -207,15 +195,19 @@ export const AuthenticatedMapScreen: FC = () => {
             <StatusBar barStyle='dark-content' />
             <Container>
                 <MapView
-                    initialRegion={region}
-                    mapType={mapSettings?.mapType || 'hybrid'}
-                    ref={mapRef}
-                    showsMyLocationButton={false}
-                    showsUserLocation={false}
                     style={{flex: 1, width: '100%'}}
-                    onRegionChangeComplete={handleRegionChange}
+                    mapStyle={getMapStyleJSON(mapType)}
+                    attributionEnabled={true}
+                    logoEnabled={false}
                 >
-                    {/* Маркеры игроков команды */}
+                    <Camera
+                        ref={cameraRef}
+                        defaultSettings={{
+                            centerCoordinate: DEFAULT_CENTER,
+                            zoomLevel: DEFAULT_ZOOM,
+                        }}
+                    />
+
                     {mapSettings?.showPlayers &&
                         teams
                             .filter((team) => activeTeamIds.includes(team.id))
@@ -223,20 +215,10 @@ export const AuthenticatedMapScreen: FC = () => {
                                 team.players.map((player) => (player.coordinates ? renderPlayerMarker(player) : null)),
                             )}
 
-                    {/* Маркер пользователя с кастомным цветом и стилем */}
                     {userLocation && (
-                        <Marker
-                            anchor={{x: 0.5, y: 0.5}}
-                            coordinate={{
-                                latitude: userLocation.latitude,
-                                longitude: userLocation.longitude,
-                            }}
-                            description={`Цвет: ${mapSettings?.userMarkerColor || '#3498db'}`}
-                            title='Вы'
-                            tracksViewChanges={false}
-                        >
+                        <MarkerView coordinate={userLocation} anchor={{x: 0.5, y: 0.5}}>
                             <UserMarker color={mapSettings?.userMarkerColor || COLORS.secondary} size={50} />
-                        </Marker>
+                        </MarkerView>
                     )}
                 </MapView>
                 {demoMode && (
@@ -291,11 +273,9 @@ export const AuthenticatedMapScreen: FC = () => {
                     </Picker>
                 </View>
             )}
-            {/* Кнопка настройки карты */}
             <TopControlsContainer topInset={insets.top}>
                 <IconButton iconType='layers' onPress={() => setShowSettings(true)} />
             </TopControlsContainer>
-            {/* Модальное окно настроек */}
 
             <Modal isVisible={showSettings} title='Настройки карты' onClose={() => setShowSettings(false)}>
                 <ScrollView showsVerticalScrollIndicator={false}>
@@ -360,8 +340,8 @@ export const AuthenticatedMapScreen: FC = () => {
                 </ScrollView>
             </Modal>
             <BottomControlsContainer topInset={insets.top}>
-                <ZoomControls mapRef={mapRef} region={region} setRegion={setRegion} />
-                <LocateButton mapRef={mapRef} setRegion={setRegion} setUserLocation={setUserLocation} />
+                <ZoomControls cameraRef={cameraRef} zoom={zoom} setZoom={setZoom} />
+                <LocateButton cameraRef={cameraRef} setUserLocation={setUserLocation} setZoom={setZoom} />
             </BottomControlsContainer>
         </SafeAreaView>
     );

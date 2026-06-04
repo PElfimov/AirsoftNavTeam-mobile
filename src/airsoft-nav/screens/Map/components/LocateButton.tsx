@@ -1,8 +1,8 @@
-import {useState} from 'react';
+import React, {useState} from 'react';
 import {TouchableOpacity, Platform, Alert} from 'react-native';
 import styled from 'styled-components/native';
 import Geolocation from '@react-native-community/geolocation';
-import MapView, {Region} from 'react-native-maps';
+import type {CameraRef} from '@maplibre/maplibre-react-native';
 
 import {LocationIcon} from '@src/airsoft-nav/ui/icons/LocationIcon';
 import {COLORS} from '@src/airsoft-nav/ui/constants/colors';
@@ -17,12 +17,14 @@ const Button = styled(TouchableOpacity)`
 `;
 
 interface Props {
-    mapRef: React.RefObject<MapView>;
-    setRegion: (region: Region) => void;
-    setUserLocation: (region: Region) => void;
+    cameraRef: React.RefObject<CameraRef | null>;
+    setUserLocation: (coordinate: [number, number]) => void;
+    setZoom?: (zoom: number) => void;
 }
 
-export const LocateButton: React.FC<Props> = ({mapRef, setRegion, setUserLocation}) => {
+const FOCUS_ZOOM = 14;
+
+export const LocateButton: React.FC<Props> = ({cameraRef, setUserLocation, setZoom}) => {
     const [isLocating, setIsLocating] = useState(false);
 
     const handleLocateMe = async () => {
@@ -34,34 +36,26 @@ export const LocateButton: React.FC<Props> = ({mapRef, setRegion, setUserLocatio
         try {
             if (Platform.OS === 'ios') {
                 Geolocation.setRNConfiguration({
-                    authorizationLevel: 'whenInUse', // или 'always'
+                    authorizationLevel: 'whenInUse',
                     skipPermissionRequests: false,
                 });
                 Geolocation.requestAuthorization();
             }
 
-            // Теперь получаем координаты
             Geolocation.getCurrentPosition(
                 (position) => {
                     const {latitude, longitude} = position.coords;
-                    const newRegion: Region = {
-                        latitude,
-                        longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                    };
-                    setRegion({
-                        latitude,
-                        longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
+                    const coordinate: [number, number] = [longitude, latitude];
+                    setUserLocation(coordinate);
+                    if (setZoom) {
+                        setZoom(FOCUS_ZOOM);
+                    }
+                    cameraRef.current?.setCamera({
+                        centerCoordinate: coordinate,
+                        zoomLevel: FOCUS_ZOOM,
+                        animationMode: 'flyTo',
+                        animationDuration: 1000,
                     });
-
-                    mapRef.current?.animateToRegion(newRegion, 1000);
-                    setRegion(newRegion);
-                    setUserLocation(newRegion);
-                    setIsLocating(false);
-
                     setIsLocating(false);
                 },
                 (error) => {
