@@ -1,5 +1,5 @@
 /* eslint-disable no-nested-ternary */
-import React, {FC, useRef, useState} from 'react';
+import React, {FC, useMemo, useRef, useState} from 'react';
 import {SafeAreaView, StatusBar, TouchableOpacity, Text, FlatList, View, Alert, ScrollView} from 'react-native';
 import {Camera, MapView, MarkerView, type CameraRef} from '@maplibre/maplibre-react-native';
 import styled from 'styled-components/native';
@@ -13,11 +13,13 @@ import {getMapStyleJSON, type MapStyleId} from './mapStyles';
 import {useActiveTeams, useTeamMutations, useTeams} from '@src/airsoft-nav/app/hooks/useTeams';
 import {useMapSettings, useMapSettingsMutations} from '@src/airsoft-nav/app/hooks/useMapSettings';
 import {useServerSettings} from '@src/airsoft-nav/app/hooks/useServerSettings';
+import {useServerPlayers} from '@src/airsoft-nav/app/hooks/useServerPlayers';
 import {StatusMapBar} from './components/StatusBar/StatusMapBar';
 import {Modal} from '@src/airsoft-nav/ui/Modal/Modal';
 import {IconButton} from '@src/airsoft-nav/ui/controls/IconButton';
 import {ColorInput} from '@src/airsoft-nav/ui/controls/ColorInput/ColorInput';
 import {COLORS} from '@src/airsoft-nav/ui/constants/colors';
+import {Player, Team} from '@src/airsoft-nav/types/airsoft';
 
 const DEFAULT_CENTER: [number, number] = [37.6173, 55.7558];
 const DEFAULT_ZOOM = 11;
@@ -131,10 +133,34 @@ export const AuthenticatedMapScreen: FC = () => {
     const {data: activeTeamIds = []} = useActiveTeams();
     const {data: mapSettings} = useMapSettings();
     const {setShowPlayers, setMapType, setUserMarkerColor} = useMapSettingsMutations();
-    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
     const {toggleActiveTeam} = useTeamMutations();
     const {data: serverSettings} = useServerSettings();
+    const {serverPlayers} = useServerPlayers();
     const demoMode = serverSettings?.demoMode || false;
+
+    // Локальные teams хранят статичные поля (позывной, команда, цвет),
+    // а живые координаты/заряд/статус приходят по WS в serverPlayers.
+    // Мерджим их по serverId при каждом рендере, чтобы маркеры двигались.
+    const liveTeams = useMemo<Team[]>(() => {
+        if (serverPlayers.length === 0) return teams;
+        const byServerId = new Map(serverPlayers.map((sp) => [sp.id, sp]));
+        return teams.map((team) => ({
+            ...team,
+            players: team.players.map((player): Player => {
+                if (!player.serverId) return player;
+                const sp = byServerId.get(player.serverId);
+                if (!sp) return player;
+                return {
+                    ...player,
+                    coordinates: {latitude: sp.latitude, longitude: sp.longitude},
+                    battery: sp.battery ?? player.battery,
+                    status: sp.status ?? player.status,
+                    timestamp: sp.timestamp ?? sp.lastUpdate ?? player.timestamp,
+                };
+            }),
+        }));
+    }, [teams, serverPlayers]);
 
     const cameraRef = useRef<CameraRef | null>(null);
     const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -157,9 +183,12 @@ export const AuthenticatedMapScreen: FC = () => {
             return null;
         }
         const coordinate: [number, number] = [player.coordinates.longitude, player.coordinates.latitude];
+        // В @maplibre/maplibre-react-native v10 MarkerView не двигается при изменении prop coordinate —
+        // нативный плагин кеширует позицию. Включаем координаты в key, чтобы маркер пере-маунтился.
+        const markerKey = `${player.id}-${coordinate[0].toFixed(6)}-${coordinate[1].toFixed(6)}`;
 
         return (
-            <MarkerView key={player.id} coordinate={coordinate} anchor={{x: 0.5, y: 0.5}}>
+            <MarkerView key={markerKey} coordinate={coordinate} anchor={{x: 0.5, y: 0.5}}>
                 <PlayerMarkerContainer color={teamColor} opacity={opacity}>
                     <PlayerMarkerText>{player.callsign.charAt(0)}</PlayerMarkerText>
                 </PlayerMarkerContainer>
@@ -167,7 +196,7 @@ export const AuthenticatedMapScreen: FC = () => {
         );
     };
 
-    const playerCount = teams
+    const playerCount = liveTeams
         .filter((team) => activeTeamIds.includes(team.id))
         .reduce((sum, team) => sum + team.players.length, 0);
 
@@ -198,7 +227,14 @@ export const AuthenticatedMapScreen: FC = () => {
                     style={{flex: 1, width: '100%'}}
                     mapStyle={getMapStyleJSON(mapType)}
                     attributionEnabled={true}
+                    // Кнопка "ⓘ" attribution — в нижний левый угол, над DemoWatermark.
+                    attributionPosition={{bottom: insets.top + 8, left: 12}}
                     logoEnabled={false}
+                    // Компас — в правый нижний угол на одном уровне с LocateButton,
+                    // слева от колонки ZoomControls+LocateButton (right: 15, width: 60 → x: ~85).
+                    compassEnabled={true}
+                    compassViewPosition={3}
+                    compassViewMargins={{x: 85, y: insets.top + 10}}
                 >
                     <Camera
                         ref={cameraRef}
@@ -209,7 +245,7 @@ export const AuthenticatedMapScreen: FC = () => {
                     />
 
                     {mapSettings?.showPlayers &&
-                        teams
+                        liveTeams
                             .filter((team) => activeTeamIds.includes(team.id))
                             .flatMap((team) =>
                                 team.players.map((player) => (player.coordinates ? renderPlayerMarker(player) : null)),
@@ -230,7 +266,7 @@ export const AuthenticatedMapScreen: FC = () => {
 
             <StatusMapBar playerCount={playerCount} />
 
-            {mapSettings?.showPlayers && teams.flatMap((team) => team.players).length > 0 && (
+            {mapSettings?.showPlayers && liveTeams.flatMap((team) => team.players).length > 0 && (
                 <View
                     style={{
                         position: 'absolute',
@@ -247,24 +283,32 @@ export const AuthenticatedMapScreen: FC = () => {
                     <Picker
                         dropdownIconColor='#fff'
                         selectedValue={selectedPlayerId}
-                        style={{width: '100%'}}
+                        style={{width: '100%', color: '#fff'}}
                         onValueChange={(value) => {
-                            setSelectedPlayerId(value);
-                            const allPlayers = teams.flatMap((team) => team.players);
+                            if (!value) {
+                                setSelectedPlayerId('');
+                                return;
+                            }
+                            const allPlayers = liveTeams.flatMap((team) => team.players);
                             const player = allPlayers.find((p) => p.id === value);
                             if (player) {
                                 focusOnPlayer(player);
                             }
+                            // Сразу сбрасываем выбор, иначе повторный тап того же игрока
+                            // не вызовет onValueChange (Picker не считает это изменением).
+                            setSelectedPlayerId('');
                         }}
                     >
-                        <Picker.Item color='#aaa' label='Найти игрока на карте...' value={undefined} />
-                        {teams
+                        {/* Цвет Picker.Item — это цвет текста в системном диалоге Android (обычно белый фон),
+                            поэтому белый/светлый — невидим. Тёмные тона работают и в системной теме, и в iOS-колесе. */}
+                        <Picker.Item color='#666' label='Найти игрока на карте...' value='' />
+                        {liveTeams
                             .filter((team) => activeTeamIds.includes(team.id))
                             .flatMap((team) =>
                                 team.players.map((player) => (
                                     <Picker.Item
                                         key={player.id}
-                                        color='#fff'
+                                        color='#222'
                                         label={`${player.callsign} (${team.name})`}
                                         value={player.id}
                                     />
