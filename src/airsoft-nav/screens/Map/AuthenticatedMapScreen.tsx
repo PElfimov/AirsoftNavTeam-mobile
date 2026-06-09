@@ -1,7 +1,7 @@
 /* eslint-disable no-nested-ternary */
 import React, {FC, useMemo, useRef, useState} from 'react';
 import {SafeAreaView, StatusBar, TouchableOpacity, Text, FlatList, View, Alert, ScrollView} from 'react-native';
-import {Camera, MapView, MarkerView, type CameraRef} from '@maplibre/maplibre-react-native';
+import {Camera, ImageSource, MapView, MarkerView, RasterLayer, type CameraRef} from '@maplibre/maplibre-react-native';
 import styled from 'styled-components/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Picker} from '@react-native-picker/picker';
@@ -11,7 +11,7 @@ import {ZoomControls} from './components/ZoomControls/ZoomControls';
 import {LocateButton} from './components/LocateButton';
 import {getMapStyleJSON, type MapStyleId} from './mapStyles';
 import {useActiveTeams, useTeamMutations, useTeams} from '@src/airsoft-nav/app/hooks/useTeams';
-import {useMapSettings, useMapSettingsMutations} from '@src/airsoft-nav/app/hooks/useMapSettings';
+import {useKMZLayers, useMapSettings, useMapSettingsMutations} from '@src/airsoft-nav/app/hooks/useMapSettings';
 import {useServerSettings} from '@src/airsoft-nav/app/hooks/useServerSettings';
 import {useServerPlayers} from '@src/airsoft-nav/app/hooks/useServerPlayers';
 import {StatusMapBar} from './components/StatusBar/StatusMapBar';
@@ -137,6 +137,7 @@ export const AuthenticatedMapScreen: FC = () => {
     const {toggleActiveTeam} = useTeamMutations();
     const {data: serverSettings} = useServerSettings();
     const {serverPlayers} = useServerPlayers();
+    const {data: kmzLayers = []} = useKMZLayers();
     const demoMode = serverSettings?.demoMode || false;
 
     // Локальные teams хранят статичные поля (позывной, команда, цвет),
@@ -243,6 +244,40 @@ export const AuthenticatedMapScreen: FC = () => {
                             zoomLevel: DEFAULT_ZOOM,
                         }}
                     />
+
+                    {/* KMZ GroundOverlay-слои — рисуем ДО маркеров игроков,
+                        чтобы маркеры оставались сверху. Iteration 1: ignore rotation. */}
+                    {mapSettings?.showKMZLayers &&
+                        kmzLayers
+                            .filter((layer) => layer.visible)
+                            .map((layer) => {
+                                const {north, south, east, west} = layer.bounds;
+                                const corners: [
+                                    [number, number],
+                                    [number, number],
+                                    [number, number],
+                                    [number, number],
+                                ] = [
+                                    [west, north], // top-left
+                                    [east, north], // top-right
+                                    [east, south], // bottom-right
+                                    [west, south], // bottom-left
+                                ];
+                                return (
+                                    <ImageSource
+                                        key={layer.id}
+                                        id={`kmz-${layer.id}`}
+                                        url={`file://${layer.imagePath}`}
+                                        coordinates={corners}
+                                    >
+                                        <RasterLayer
+                                            id={`kmz-${layer.id}-layer`}
+                                            sourceID={`kmz-${layer.id}`}
+                                            style={{rasterOpacity: layer.opacity}}
+                                        />
+                                    </ImageSource>
+                                );
+                            })}
 
                     {mapSettings?.showPlayers &&
                         liveTeams

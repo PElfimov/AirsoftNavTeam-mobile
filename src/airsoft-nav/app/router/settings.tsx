@@ -6,12 +6,14 @@ import {PlayerDetailScreen} from '@src/airsoft-nav/screens/team/PlayerDetailScre
 import {TeamSettingsScreen} from '@src/airsoft-nav/screens/team/TeamSettingsScreen';
 import {SettingsScreen} from '@src/airsoft-nav/screens/settings/SettingsScreen';
 import {ServerSettingsScreen} from '@src/airsoft-nav/screens/settings/ServerSettingsScreen';
+import {KMZLayersScreen} from '@src/airsoft-nav/screens/settings/KMZLayersScreen';
 
 export type TeamStackParamList = {
     Settings: undefined;
     TeamSettings: undefined;
     PlayerDetail: {teamId: string; playerId?: string};
     ServerSettings: undefined;
+    KMZLayers: undefined;
 };
 
 const Stack = createStackNavigator<TeamStackParamList>();
@@ -35,5 +37,6 @@ export const SettingsStack = () => (
             })}
         />
         <Stack.Screen component={ServerSettingsScreen} name='ServerSettings' options={{title: 'Настройки сервера'}} />
+        <Stack.Screen component={KMZLayersScreen} name='KMZLayers' options={{title: 'Карты полигона (KMZ)'}} />
     </Stack.Navigator>
 );

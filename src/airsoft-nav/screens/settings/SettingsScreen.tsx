@@ -104,6 +104,18 @@ export const SettingsScreen: FC = () => {
                 </Section>
 
                 <Section>
+                    <SectionTitle>Карта</SectionTitle>
+
+                    <MenuItem onPress={() => navigation.navigate('KMZLayers')}>
+                        <MenuItemContent>
+                            <MenuItemTitle>Карты полигона (KMZ)</MenuItemTitle>
+                            <MenuItemSubtitle>Импорт GroundOverlay поверх базовой карты</MenuItemSubtitle>
+                        </MenuItemContent>
+                        <MenuItemArrow>→</MenuItemArrow>
+                    </MenuItem>
+                </Section>
+
+                <Section>
                     <SectionTitle>Сервер</SectionTitle>
 
                     <MenuItem onPress={() => navigation.navigate('ServerSettings')}>
