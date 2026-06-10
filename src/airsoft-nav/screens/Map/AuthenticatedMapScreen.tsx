@@ -7,6 +7,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {UserMarker} from '../../ui/icons/UserMarker';
 import {ZoomControls} from './components/ZoomControls/ZoomControls';
 import {LocateButton} from './components/LocateButton';
+import {PlayerInfoModal} from './components/PlayerInfoModal';
 import {getMapStyleJSON, type MapStyleId} from './mapStyles';
 import {useActiveTeams, useTeamMutations, useTeams} from '@src/airsoft-nav/app/hooks/useTeams';
 import {useKMZLayers, useMapSettings, useMapSettingsMutations} from '@src/airsoft-nav/app/hooks/useMapSettings';
@@ -159,6 +160,7 @@ export const AuthenticatedMapScreen: FC = () => {
     const {data: mapSettings} = useMapSettings();
     const {setShowPlayers, setMapType, setUserMarkerColor} = useMapSettingsMutations();
     const [showPlayerFinder, setShowPlayerFinder] = useState<boolean>(false);
+    const [selectedMarker, setSelectedMarker] = useState<{player: Player; team: Team} | null>(null);
     const {toggleActiveTeam} = useTeamMutations();
     const {serverPlayers} = useServerPlayers();
     const {data: kmzLayers = []} = useKMZLayers();
@@ -195,13 +197,7 @@ export const AuthenticatedMapScreen: FC = () => {
 
     const mapType: MapStyleId = (mapSettings?.mapType as MapStyleId) || 'hybrid';
 
-    const getTeamColor = (teamId: string): string => {
-        const team = teams.find((t) => t.id === teamId);
-        return team?.color || '#CCCCCC';
-    };
-
-    const renderPlayerMarker = (player: any) => {
-        const teamColor = getTeamColor(player.teamId);
+    const renderPlayerMarker = (player: Player, team: Team) => {
         const opacity = player.status === 'eliminated' ? 0.5 : 1;
         if (!player.coordinates) {
             return null;
@@ -213,9 +209,11 @@ export const AuthenticatedMapScreen: FC = () => {
 
         return (
             <MarkerView key={markerKey} coordinate={coordinate} anchor={{x: 0.5, y: 0.5}}>
-                <PlayerMarkerContainer color={teamColor} opacity={opacity}>
-                    <PlayerMarkerText>{player.callsign.charAt(0)}</PlayerMarkerText>
-                </PlayerMarkerContainer>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedMarker({player, team})}>
+                    <PlayerMarkerContainer color={team.color} opacity={opacity}>
+                        <PlayerMarkerText>{player.callsign.charAt(0)}</PlayerMarkerText>
+                    </PlayerMarkerContainer>
+                </TouchableOpacity>
             </MarkerView>
         );
     };
@@ -311,7 +309,9 @@ export const AuthenticatedMapScreen: FC = () => {
                         liveTeams
                             .filter((team) => activeTeamIds.includes(team.id))
                             .flatMap((team) =>
-                                team.players.map((player) => (player.coordinates ? renderPlayerMarker(player) : null)),
+                                team.players.map((player) =>
+                                    player.coordinates ? renderPlayerMarker(player, team) : null,
+                                ),
                             )}
 
                     {userLocation && (
@@ -444,6 +444,14 @@ export const AuthenticatedMapScreen: FC = () => {
                 <ZoomControls cameraRef={cameraRef} zoom={zoom} setZoom={setZoom} />
                 <LocateButton cameraRef={cameraRef} setUserLocation={setUserLocation} setZoom={setZoom} />
             </BottomControlsContainer>
+
+            <PlayerInfoModal
+                player={selectedMarker?.player ?? null}
+                team={selectedMarker?.team ?? null}
+                userLocation={userLocation}
+                onClose={() => setSelectedMarker(null)}
+                onFocus={focusOnPlayer}
+            />
         </SafeAreaView>
     );
 };
