@@ -4,8 +4,6 @@ import {SafeAreaView, StatusBar, TouchableOpacity, Text, FlatList, View, Alert, 
 import {Camera, ImageSource, MapView, MarkerView, RasterLayer, type CameraRef} from '@maplibre/maplibre-react-native';
 import styled from 'styled-components/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Picker} from '@react-native-picker/picker';
-
 import {UserMarker} from '../../ui/icons/UserMarker';
 import {ZoomControls} from './components/ZoomControls/ZoomControls';
 import {LocateButton} from './components/LocateButton';
@@ -112,13 +110,55 @@ const PlayerMarkerText = styled.Text`
     font-weight: bold;
 `;
 
+const PlayerFinderButton = styled.TouchableOpacity`
+    background-color: rgba(44, 44, 44, 0.9);
+    border-radius: 12px;
+    padding-horizontal: 16px;
+    padding-vertical: 18px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+`;
+
+const PlayerFinderButtonText = styled.Text`
+    color: #fff;
+    font-size: 15px;
+    flex: 1;
+`;
+
+const PlayerListRow = styled.TouchableOpacity<{disabled?: boolean}>`
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 12px;
+    background-color: #3a3a3a;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+`;
+
+const PlayerListMeta = styled.View`
+    flex: 1;
+`;
+
+const PlayerListCallsign = styled.Text`
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+`;
+
+const PlayerListTeam = styled.Text`
+    color: #aaa;
+    font-size: 13px;
+    margin-top: 2px;
+`;
+
 export const AuthenticatedMapScreen: FC = () => {
     const insets = useSafeAreaInsets();
     const {data: teams = []} = useTeams();
     const {data: activeTeamIds = []} = useActiveTeams();
     const {data: mapSettings} = useMapSettings();
     const {setShowPlayers, setMapType, setUserMarkerColor} = useMapSettingsMutations();
-    const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+    const [showPlayerFinder, setShowPlayerFinder] = useState<boolean>(false);
     const {toggleActiveTeam} = useTeamMutations();
     const {serverPlayers} = useServerPlayers();
     const {data: kmzLayers = []} = useKMZLayers();
@@ -199,9 +239,15 @@ export const AuthenticatedMapScreen: FC = () => {
             animationMode: 'flyTo',
             animationDuration: 1000,
         });
-
-        Alert.alert('Найден игрок', `${player.callsign} (${player.role || 'игрок'})`);
     };
+
+    const visiblePlayers = useMemo(
+        () =>
+            liveTeams
+                .filter((team) => activeTeamIds.includes(team.id))
+                .flatMap((team) => team.players.map((player) => ({player, team}))),
+        [liveTeams, activeTeamIds],
+    );
 
     return (
         <SafeAreaView style={{flex: 1}}>
@@ -278,57 +324,56 @@ export const AuthenticatedMapScreen: FC = () => {
 
             <StatusMapBar playerCount={playerCount} />
 
-            {mapSettings?.showPlayers && liveTeams.flatMap((team) => team.players).length > 0 && (
+            {mapSettings?.showPlayers && visiblePlayers.length > 0 && (
                 <View
                     style={{
                         position: 'absolute',
                         top: insets.top + 80,
                         right: 20,
-                        backgroundColor: 'rgba(44, 44, 44, 0.9)',
-                        borderRadius: 12,
                         zIndex: 10,
-                        width: 200,
-                        justifyContent: 'center',
-                        height: 60,
+                        width: 220,
                     }}
                 >
-                    <Picker
-                        dropdownIconColor='#fff'
-                        selectedValue={selectedPlayerId}
-                        style={{width: '100%', color: '#fff'}}
-                        onValueChange={(value) => {
-                            if (!value) {
-                                setSelectedPlayerId('');
-                                return;
-                            }
-                            const allPlayers = liveTeams.flatMap((team) => team.players);
-                            const player = allPlayers.find((p) => p.id === value);
-                            if (player) {
-                                focusOnPlayer(player);
-                            }
-                            // Сразу сбрасываем выбор, иначе повторный тап того же игрока
-                            // не вызовет onValueChange (Picker не считает это изменением).
-                            setSelectedPlayerId('');
-                        }}
-                    >
-                        {/* Цвет Picker.Item — это цвет текста в системном диалоге Android (обычно белый фон),
-                            поэтому белый/светлый — невидим. Тёмные тона работают и в системной теме, и в iOS-колесе. */}
-                        <Picker.Item color='#666' label='Найти игрока на карте...' value='' />
-                        {liveTeams
-                            .filter((team) => activeTeamIds.includes(team.id))
-                            .flatMap((team) =>
-                                team.players.map((player) => (
-                                    <Picker.Item
-                                        key={player.id}
-                                        color='#222'
-                                        label={`${player.callsign} (${team.name})`}
-                                        value={player.id}
-                                    />
-                                )),
-                            )}
-                    </Picker>
+                    <PlayerFinderButton onPress={() => setShowPlayerFinder(true)}>
+                        <PlayerFinderButtonText>Найти игрока на карте…</PlayerFinderButtonText>
+                        <Text style={{color: '#fff', fontSize: 14, marginLeft: 8}}>▾</Text>
+                    </PlayerFinderButton>
                 </View>
             )}
+
+            <Modal
+                isVisible={showPlayerFinder}
+                title='Выбор игрока'
+                onClose={() => setShowPlayerFinder(false)}
+            >
+                <FlatList
+                    data={visiblePlayers}
+                    keyExtractor={({player}) => player.id}
+                    renderItem={({item: {player, team}}) => {
+                        const hasCoords = !!player.coordinates;
+                        return (
+                            <PlayerListRow
+                                disabled={!hasCoords}
+                                onPress={() => {
+                                    if (!hasCoords) return;
+                                    setShowPlayerFinder(false);
+                                    focusOnPlayer(player);
+                                }}
+                            >
+                                <TeamColorIndicator color={team.color} />
+                                <PlayerListMeta>
+                                    <PlayerListCallsign>{player.callsign}</PlayerListCallsign>
+                                    <PlayerListTeam>
+                                        {team.name}
+                                        {hasCoords ? '' : ' · нет координат'}
+                                    </PlayerListTeam>
+                                </PlayerListMeta>
+                            </PlayerListRow>
+                        );
+                    }}
+                />
+            </Modal>
+
             <TopControlsContainer topInset={insets.top}>
                 <IconButton iconType='layers' onPress={() => setShowSettings(true)} />
             </TopControlsContainer>
