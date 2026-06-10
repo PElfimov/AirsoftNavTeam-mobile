@@ -12,7 +12,6 @@ import {LocateButton} from './components/LocateButton';
 import {getMapStyleJSON, type MapStyleId} from './mapStyles';
 import {useActiveTeams, useTeamMutations, useTeams} from '@src/airsoft-nav/app/hooks/useTeams';
 import {useKMZLayers, useMapSettings, useMapSettingsMutations} from '@src/airsoft-nav/app/hooks/useMapSettings';
-import {useServerSettings} from '@src/airsoft-nav/app/hooks/useServerSettings';
 import {useServerPlayers} from '@src/airsoft-nav/app/hooks/useServerPlayers';
 import {StatusMapBar} from './components/StatusBar/StatusMapBar';
 import {Modal} from '@src/airsoft-nav/ui/Modal/Modal';
@@ -112,20 +111,6 @@ const PlayerMarkerText = styled.Text`
     font-size: 18px;
     font-weight: bold;
 `;
-const DemoWatermark = styled.View<{topInset: number}>`
-    position: absolute;
-    bottom: 0px;
-    background-color: rgba(128, 129, 129, 0.5);
-    padding-horizontal: 16px;
-    padding-vertical: 8px;
-    z-index: 100;
-`;
-
-const DemoText = styled.Text`
-    color: ${COLORS.contrast};
-    font-size: 18px;
-    letter-spacing: 2px;
-`;
 
 export const AuthenticatedMapScreen: FC = () => {
     const insets = useSafeAreaInsets();
@@ -135,10 +120,8 @@ export const AuthenticatedMapScreen: FC = () => {
     const {setShowPlayers, setMapType, setUserMarkerColor} = useMapSettingsMutations();
     const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
     const {toggleActiveTeam} = useTeamMutations();
-    const {data: serverSettings} = useServerSettings();
     const {serverPlayers} = useServerPlayers();
     const {data: kmzLayers = []} = useKMZLayers();
-    const demoMode = serverSettings?.demoMode || false;
 
     // Локальные teams хранят статичные поля (позывной, команда, цвет),
     // а живые координаты/заряд/статус приходят по WS в serverPlayers.
@@ -228,7 +211,6 @@ export const AuthenticatedMapScreen: FC = () => {
                     style={{flex: 1, width: '100%'}}
                     mapStyle={getMapStyleJSON(mapType)}
                     attributionEnabled={true}
-                    // Кнопка "ⓘ" attribution — в нижний левый угол, над DemoWatermark.
                     attributionPosition={{bottom: insets.top + 8, left: 12}}
                     logoEnabled={false}
                     // Компас — в правый нижний угол на одном уровне с LocateButton,
@@ -292,11 +274,6 @@ export const AuthenticatedMapScreen: FC = () => {
                         </MarkerView>
                     )}
                 </MapView>
-                {demoMode && (
-                    <DemoWatermark topInset={insets.top}>
-                        <DemoText>Данные сгенерированы для демонстрации</DemoText>
-                    </DemoWatermark>
-                )}
             </Container>
 
             <StatusMapBar playerCount={playerCount} />
